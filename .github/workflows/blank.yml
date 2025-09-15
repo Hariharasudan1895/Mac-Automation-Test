@@ -1,0 +1,72 @@
+name: Paltalk Web Automation (Mac Runner)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  run-web-automation:
+    runs-on: macos-latest   # Use macOS runner
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Verify Java Installation
+        run: java -version
+
+      - name: Setup Node.js (required for Appium)
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install Appium
+        run: |
+          npm install -g appium
+          appium -v
+
+      - name: Start Appium Server in background
+        run: |
+          echo "Starting Appium server..."
+          nohup appium --address 127.0.0.1 --port 4723 > appium.log 2>&1 &
+          sleep 10
+          echo "Appium server started."
+
+      - name: Run Paltalk Automation JAR
+        run: |
+          echo "Starting Web Automation..."
+          java -jar paltalk.jar
+          echo "Web Automation completed."
+
+      - name: Stop Appium Server (cleanup)
+        if: always()
+        run: |
+          echo "Stopping Appium server..."
+          pkill -f appium || true
+          echo "Appium server stopped."
+
+      - name: Upload Test Reports (Artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TestReports
+          path: reports/
+
+  publish-report:
+    needs: run-web-automation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download Test Reports
+        uses: actions/download-artifact@v4
+        with:
+          name: TestReports
+          path: ./reports
+
+      - name: Set Report URL
+        run: |
+          echo "REPORT_URL=artifact://TestReports/index.html" >> $GITHUB_ENV
+          echo "Report available at $REPORT_URL"
