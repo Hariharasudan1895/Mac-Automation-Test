@@ -1,0 +1,66 @@
+name: Paltalk Web Automation (Windows Runner)
+
+on:
+  push:
+    branches:
+      - main       # Trigger on main branch
+  workflow_dispatch:       # Allow manual runs
+
+jobs:
+  run-web-automation:
+    runs-on: self-hosted   # your Windows runner
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Verify Java Installation
+        run: java -version
+        shell: powershell
+
+      - name: Start WinAppDriver in background
+        shell: powershell
+        run: |
+          Write-Output "Starting WinAppDriver..."
+          Start-Process -FilePath "C:\Program Files (x86)\Windows Application Driver\WinAppDriver.exe" -ArgumentList "127.0.0.1 4723" -PassThru
+          Start-Sleep -Seconds 10
+          Write-Output "WinAppDriver started."
+
+      - name: Run Paltalk Automation JAR
+        shell: powershell
+        run: |
+          Write-Output "Starting Web Automation..."
+          java -jar paltalk.jar
+          Write-Output "Web Automation completed."
+
+      - name: Stop WinAppDriver (cleanup)
+        if: always()
+        shell: powershell
+        run: |
+          Write-Output "Stopping WinAppDriver..."
+          Get-Process WinAppDriver -ErrorAction SilentlyContinue | Stop-Process -Force
+          Write-Output "WinAppDriver stopped."
+
+      - name: Upload Test Reports (Artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TestReports
+          path: reports/   # adjust if your JAR writes to another folder
+
+  publish-report:
+    needs: run-web-automation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download Test Reports
+        uses: actions/download-artifact@v4
+        with:
+          name: TestReports
+          path: ./reports
+
+      - name: Set Report URL
+        run: |
+          echo "REPORT_URL=artifact://TestReports/index.html" >> $GITHUB_ENV
+          echo "Report available at $REPORT_URL"
