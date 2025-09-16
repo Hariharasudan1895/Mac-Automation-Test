@@ -36,7 +36,7 @@ jobs:
       - name: Run Paltalk Automation JAR
         run: |
           echo "Starting Web Automation..."
-          java -jar paltalk.jar
+          java -jar Mac_runnable.jar
           echo "Web Automation completed."
 
       - name: Stop Appium Server (cleanup)
