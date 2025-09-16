@@ -21,10 +21,12 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Appium
+      - name: Install Appium + mac2 driver
         run: |
           npm install -g appium
           appium -v
+          appium driver install mac2
+          appium driver list --installed
 
       - name: Start Appium Server in background
         run: |
