@@ -1,4 +1,4 @@
-name: Paltalk Web Automation (Mac Runner)
+name: Paltalk Mac Automation
 
 on:
   push:
@@ -7,68 +7,48 @@ on:
   workflow_dispatch:
 
 jobs:
-  run-web-automation:
-    runs-on: macos-latest   # Use macOS runner
+  run-mac-automation:
+    runs-on: self-hosted   # Mac runner you registered
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Verify Java Installation
-        run: java -version
-
-      - name: Setup Node.js (required for Appium)
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20'
-
-      - name: Install Appium + mac2 driver
+      - name: Verify Paltalk bundle ID
         run: |
-          npm install -g appium
-          appium -v
-          appium driver install mac2
+          echo "Checking bundle ID for Paltalk..."
+          osascript -e 'id of app "Paltalk"'
+
+      - name: Ensure Appium + mac2 driver installed
+        run: |
+          echo "Installing Appium + mac2 driver..."
+          npm install -g appium@next
+          appium driver install mac2 || true
+          echo "Installed Appium drivers:"
           appium driver list --installed
 
-      - name: Start Appium Server in background
+      - name: Start Appium server in background
         run: |
           echo "Starting Appium server..."
-          nohup appium --address 127.0.0.1 --port 4723 > appium.log 2>&1 &
+          nohup appium --address 127.0.0.1 --port 4723 --log-level debug > appium.log 2>&1 &
+          echo $! > appium.pid
           sleep 10
-          echo "Appium server started."
+          echo "Appium started with PID: $(cat appium.pid)"
 
-      - name: Run Paltalk Automation JAR
+      - name: Tail Appium logs (background)
         run: |
-          echo "Starting Web Automation..."
-          java -jar Mac_runnable.jar
-          echo "Web Automation completed."
+          echo "Tailing Appium logs..."
+          nohup tail -f appium.log > appium-tail.log 2>&1 &
 
-      - name: Stop Appium Server (cleanup)
-        if: always()
+      - name: Run automation JAR
         run: |
-          echo "Stopping Appium server..."
-          pkill -f appium || true
-          echo "Appium server stopped."
+          echo "Running automation tests..."
+          java -jar target/automation.jar | tee automation.log
 
-      - name: Upload Test Reports (Artifact)
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Upload logs as artifacts
+        uses: actions/upload-artifact@v3
         with:
-          name: TestReports
-          path: reports/
-
-  publish-report:
-    needs: run-web-automation
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Download Test Reports
-        uses: actions/download-artifact@v4
-        with:
-          name: TestReports
-          path: ./reports
-
-      - name: Set Report URL
-        run: |
-          echo "REPORT_URL=artifact://TestReports/index.html" >> $GITHUB_ENV
-          echo "Report available at $REPORT_URL"
+          name: mac-automation-logs
+          path: |
+            appium.log
+            appium-tail.log
+            automation.log
