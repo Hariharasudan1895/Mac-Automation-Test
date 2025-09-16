@@ -8,10 +8,10 @@ on:
 
 jobs:
   run-mac-automation:
-    runs-on: self-hosted   # Mac runner you registered
+    runs-on: self-hosted   # Your Mac runner
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Verify Paltalk bundle ID
         run: |
@@ -42,13 +42,42 @@ jobs:
       - name: Run automation JAR
         run: |
           echo "Running automation tests..."
-          java -jar target/automation.jar | tee automation.log
+          java -jar Mac_runnable.jar | tee automation.log
 
-      - name: Upload logs as artifacts
-        uses: actions/upload-artifact@v3
+      - name: Stop Appium Server
+        if: always()
+        run: |
+          if [ -f appium.pid ]; then
+            echo "Stopping Appium server..."
+            kill -9 $(cat appium.pid) || true
+            rm -f appium.pid
+          fi
+
+      - name: Upload Logs and Reports
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: mac-automation-logs
+          name: mac-automation-artifacts
           path: |
             appium.log
             appium-tail.log
             automation.log
+            reports/
+
+  publish-report:
+    needs: run-mac-automation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Test Reports
+        uses: actions/download-artifact@v4
+        with:
+          name: mac-automation-artifacts
+          path: ./reports
+
+      - name: Set Report URL
+        run: |
+          echo "REPORT_URL=artifact://mac-automation-artifacts/reports/onboarding.html" >> $GITHUB_ENV
+          echo "Report available at $REPORT_URL"
