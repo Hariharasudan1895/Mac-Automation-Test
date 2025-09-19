@@ -13,18 +13,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Enable DevToolsSecurity & Add Runner User to _developer
-        run: |
-          echo "Enabling DevToolsSecurity..."
-          sudo /usr/sbin/DevToolsSecurity --enable
-          echo "Adding runner user to _developer group if not already..."
-          if ! id -Gn "$(whoami)" | grep -qw "_developer"; then
-            sudo dscl . append /Groups/_developer GroupMembership "$(whoami)"
-            echo "User $(whoami) added to _developer group"
-          else
-            echo "User $(whoami) already in _developer group"
-          fi
-
       - name: Verify Paltalk bundle ID
         run: |
           echo "Checking bundle ID for Paltalk..."
