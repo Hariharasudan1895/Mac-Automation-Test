@@ -3,7 +3,7 @@ name: Paltalk iOS Automation
 on:
   push:
     branches:
-      - main
+      - IOS
   workflow_dispatch:
 
 jobs:
