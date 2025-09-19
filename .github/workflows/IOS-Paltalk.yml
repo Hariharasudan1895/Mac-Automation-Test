@@ -1,0 +1,101 @@
+name: Paltalk iOS Automation
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  run-ios-automation:
+    runs-on: self-hosted   # Your Mac runner with Xcode + iOS simulator
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify Xcode installation
+        run: |
+          echo "Checking Xcode version..."
+          xcodebuild -version
+
+      - name: List available iOS simulators
+        run: |
+          echo "Listing iOS simulators..."
+          xcrun simctl list devices
+
+      - name: Boot iOS simulator
+        run: |
+          echo "Booting iOS simulator (iPhone 14)..."
+          SIMULATOR_ID=$(xcrun simctl list devices | grep 'iPhone 14 (' | grep -v unavailable | head -n1 | awk -F '[()]' '{print $2}')
+          if [ -z "$SIMULATOR_ID" ]; then
+            echo "No iPhone 14 simulator found!"
+            exit 1
+          fi
+          xcrun simctl boot "$SIMULATOR_ID" || true
+          xcrun simctl bootstatus "$SIMULATOR_ID" -b
+          echo "Using Simulator ID: $SIMULATOR_ID"
+          echo "SIMULATOR_ID=$SIMULATOR_ID" >> $GITHUB_ENV
+
+      - name: Ensure Appium + xcuitest driver installed
+        run: |
+          echo "Installing Appium + xcuitest driver..."
+          npm install -g appium@next
+          appium driver install xcuitest || true
+          echo "Installed Appium drivers:"
+          appium driver list --installed
+
+      - name: Start Appium server in background
+        run: |
+          echo "Starting Appium server..."
+          nohup appium --address 127.0.0.1 --port 4723 --log-level debug > appium.log 2>&1 &
+          echo $! > appium.pid
+          sleep 10
+          echo "Appium started with PID: $(cat appium.pid)"
+
+      - name: Tail Appium logs (background)
+        run: |
+          echo "Tailing Appium logs..."
+          nohup tail -f appium.log > appium-tail.log 2>&1 &
+
+      - name: Run iOS automation JAR
+        run: |
+          echo "Running iOS automation tests..."
+          java -jar IOS_runnable.jar | tee automation.log
+
+      - name: Stop Appium Server
+        if: always()
+        run: |
+          if [ -f appium.pid ]; then
+            echo "Stopping Appium server..."
+            kill -9 $(cat appium.pid) || true
+            rm -f appium.pid
+          fi
+
+      - name: Upload Logs and Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-automation-artifacts
+          path: |
+            appium.log
+            appium-tail.log
+            automation.log
+            reports/
+
+  publish-report:
+    needs: run-ios-automation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Test Reports
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-automation-artifacts
+          path: ./reports
+
+      - name: Set Report URL
+        run: |
+          echo "REPORT_URL=artifact://ios-automation-artifacts/reports/onboarding.html" >> $GITHUB_ENV
+          echo "Report available at $REPORT_URL"
