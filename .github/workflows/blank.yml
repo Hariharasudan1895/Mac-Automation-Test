@@ -13,6 +13,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install Node.js & npm
+        run: |
+          echo "Installing Node.js and npm..."
+          if ! command -v npm &> /dev/null; then
+            brew install node || true
+          fi
+          echo "Verifying Node.js and npm versions..."
+          node -v
+          npm -v
+
       - name: Verify Paltalk bundle ID
         run: |
           echo "Checking bundle ID for Paltalk..."
