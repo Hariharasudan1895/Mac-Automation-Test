@@ -13,35 +13,40 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Node.js & npm via curl
+      - name: Check and install Node.js & npm
         run: |
-          echo "Installing Node.js and npm using curl..."
+          echo "Checking if Node.js and npm are installed..."
 
-          # Download Node.js binary (LTS version)
-          NODE_VERSION="20.6.1"  # change to latest LTS if needed
-          ARCH=$(uname -m)
-          if [ "$ARCH" = "arm64" ]; then
-            NODE_DISTRO="node-v${NODE_VERSION}-darwin-arm64"
+          if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+            echo "✅ Node.js and npm already installed."
+            node -v
+            npm -v
           else
-            NODE_DISTRO="node-v${NODE_VERSION}-darwin-x64"
+            echo "⚙️ Installing Node.js and npm using curl..."
+            NODE_VERSION="20.6.1"  # change to latest LTS if needed
+            ARCH=$(uname -m)
+            if [ "$ARCH" = "arm64" ]; then
+              NODE_DISTRO="node-v${NODE_VERSION}-darwin-arm64"
+            else
+              NODE_DISTRO="node-v${NODE_VERSION}-darwin-x64"
+            fi
+
+            curl -O "https://nodejs.org/dist/v${NODE_VERSION}/${NODE_DISTRO}.tar.gz"
+
+            # Extract
+            tar -xzf "${NODE_DISTRO}.tar.gz"
+
+            # Move to /usr/local
+            sudo mv "${NODE_DISTRO}" /usr/local/node
+
+            # Add node to PATH
+            export PATH=/usr/local/node/bin:$PATH
+            echo 'export PATH=/usr/local/node/bin:$PATH' >> ~/.bash_profile
+
+            echo "✅ Node.js and npm installed successfully!"
+            /usr/local/node/bin/node -v
+            /usr/local/node/bin/npm -v
           fi
-
-          curl -O "https://nodejs.org/dist/v${NODE_VERSION}/${NODE_DISTRO}.tar.gz"
-
-          # Extract
-          tar -xzf "${NODE_DISTRO}.tar.gz"
-
-          # Move to /usr/local (or custom path)
-          sudo mv "${NODE_DISTRO}" /usr/local/node
-
-          # Add node to PATH
-          export PATH=/usr/local/node/bin:$PATH
-          echo 'export PATH=/usr/local/node/bin:$PATH' >> ~/.bash_profile
-
-          echo "Verifying Node.js and npm versions..."
-          /usr/local/node/bin/node -v
-          /usr/local/node/bin/npm -v
-
 
       - name: Verify Paltalk bundle ID
         run: |
