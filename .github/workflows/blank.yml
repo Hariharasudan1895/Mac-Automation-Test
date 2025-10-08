@@ -27,7 +27,6 @@ jobs:
             npm -v
           else
             echo "❌ Node.js or npm not found — installing..."
-            curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
             brew install node
           fi
 
@@ -41,15 +40,17 @@ jobs:
           fi
 
           echo "Checking mac2 driver..."
-          if appium driver list --installed | grep -q "mac2"; then
+          # Robust check for mac2 presence
+          if appium driver list --installed | grep -E "mac2@"; then
             echo "✅ mac2 driver already installed"
           else
             echo "❌ mac2 driver not found — installing..."
-            appium driver install mac2
+            appium driver install mac2 || echo "⚠️ mac2 installation skipped or already installed"
           fi
 
           echo "Installed Appium drivers:"
           appium driver list --installed
+
 
       - name: Start Appium server
         run: |
