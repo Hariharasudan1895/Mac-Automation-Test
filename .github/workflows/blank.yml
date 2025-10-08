@@ -69,20 +69,22 @@ jobs:
       - name: Run automation JAR
         run: |
           echo "Checking Java installation..."
-          if command -v java >/dev/null 2>&1; then
-            echo "✅ Java found"
+
+          # Detect real Java (not just Apple’s stub)
+          if command -v java >/dev/null 2>&1 && ! java -version 2>&1 | grep -q "Unable to locate a Java Runtime"; then
+            echo "✅ Valid Java found"
             java -version
           else
-            echo "❌ Java not found — installing..."
+            echo "❌ No valid Java runtime found — installing OpenJDK 17..."
             brew install openjdk@17
             sudo ln -sfn $(brew --prefix openjdk@17)/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk
             echo 'export PATH="$(brew --prefix openjdk@17)/bin:$PATH"' >> ~/.bash_profile
             source ~/.bash_profile
+            java -version
           fi
 
           echo "Running automation tests..."
           java -jar Mac_runnable.jar | tee automation.log
-
 
       - name: Stop Appium Server
         if: always()
