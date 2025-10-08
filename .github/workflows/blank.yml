@@ -68,8 +68,21 @@ jobs:
 
       - name: Run automation JAR
         run: |
+          echo "Checking Java installation..."
+          if command -v java >/dev/null 2>&1; then
+            echo "✅ Java found"
+            java -version
+          else
+            echo "❌ Java not found — installing..."
+            brew install openjdk@17
+            sudo ln -sfn $(brew --prefix openjdk@17)/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk
+            echo 'export PATH="$(brew --prefix openjdk@17)/bin:$PATH"' >> ~/.bash_profile
+            source ~/.bash_profile
+          fi
+
           echo "Running automation tests..."
           java -jar Mac_runnable.jar | tee automation.log
+
 
       - name: Stop Appium Server
         if: always()
