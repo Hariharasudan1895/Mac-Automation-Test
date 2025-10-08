@@ -18,26 +18,52 @@ jobs:
           echo "Checking bundle ID for Paltalk..."
           osascript -e 'id of app "Paltalk"'
 
-      - name: Ensure Appium + mac2 driver installed
+      - name: Ensure Appium + mac2 driver installed (use existing if available)
         run: |
-          echo "Installing Appium + mac2 driver..."
-          npm install -g appium@next
-          appium driver install mac2 || true
+          echo "Checking Node.js and npm..."
+          if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+            echo "✅ Node.js and npm found"
+            node -v
+            npm -v
+          else
+            echo "❌ Node.js or npm not found — installing..."
+            curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+            brew install node
+          fi
+
+          echo "Checking Appium installation..."
+          if command -v appium >/dev/null 2>&1; then
+            echo "✅ Appium already installed"
+            appium -v
+          else
+            echo "❌ Appium not found — installing..."
+            npm install -g appium@next
+          fi
+
+          echo "Checking mac2 driver..."
+          if appium driver list --installed | grep -q "mac2"; then
+            echo "✅ mac2 driver already installed"
+          else
+            echo "❌ mac2 driver not found — installing..."
+            appium driver install mac2
+          fi
+
           echo "Installed Appium drivers:"
           appium driver list --installed
 
-      - name: Start Appium server in background
+      - name: Start Appium server
         run: |
           echo "Starting Appium server..."
-          nohup appium --address 127.0.0.1 --port 4723 --log-level debug > appium.log 2>&1 &
+          nohup appium --address 127.0.0.1 --port 4723 --log-level info > appium.log 2>&1 &
           echo $! > appium.pid
           sleep 10
-          echo "Appium started with PID: $(cat appium.pid)"
-
-      - name: Tail Appium logs (background)
-        run: |
-          echo "Tailing Appium logs..."
-          nohup tail -f appium.log > appium-tail.log 2>&1 &
+          if ps -p $(cat appium.pid) > /dev/null; then
+            echo "✅ Appium started successfully (PID: $(cat appium.pid))"
+          else
+            echo "❌ Failed to start Appium"
+            cat appium.log
+            exit 1
+          fi
 
       - name: Run automation JAR
         run: |
@@ -51,6 +77,9 @@ jobs:
             echo "Stopping Appium server..."
             kill -9 $(cat appium.pid) || true
             rm -f appium.pid
+            echo "✅ Appium stopped"
+          else
+            echo "No Appium PID file found — skipping"
           fi
 
       - name: Upload Logs and Reports
@@ -60,7 +89,6 @@ jobs:
           name: mac-automation-artifacts
           path: |
             appium.log
-            appium-tail.log
             automation.log
             reports/
 
