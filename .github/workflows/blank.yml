@@ -1,4 +1,4 @@
-name: Paltalk Mac Automation
+name: Mac Automation - Dependency Check and Run
 
 on:
   push:
@@ -8,120 +8,29 @@ on:
 
 jobs:
   run-mac-automation:
-    runs-on: self-hosted   # Your Mac runner
+    runs-on: self-hosted
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
-        
-      - name: Verify Paltalk bundle ID
+
+      - name: Check Required Dependencies
         run: |
-          echo "Checking bundle ID for Paltalk..."
-          osascript -e 'id of app "Paltalk"'
+          echo "Checking required dependencies..."
 
-      - name: Ensure Appium + mac2 driver installed (use existing if available)
+          REQUIRED_TOOLS=("java" "node" "npm" "appium" "ideviceinstaller" "adb")
+
+          for tool in "${REQUIRED_TOOLS[@]}"; do
+            if ! command -v "$tool" &> /dev/null; then
+              echo "Error: Missing dependency '$tool'. Please install it before running the pipeline."
+              exit 1
+            else
+              echo "$tool found"
+            fi
+          done
+
+          echo "All dependencies are installed."
+
+      - name: Run Automation Tests
         run: |
-          echo "Checking Node.js and npm..."
-          if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
-            echo "✅ Node.js and npm found"
-            node -v
-            npm -v
-          else
-            echo "❌ Node.js or npm not found — installing..."
-            brew install node
-          fi
-
-          echo "Checking Appium installation..."
-          if command -v appium >/dev/null 2>&1; then
-            echo "✅ Appium already installed"
-            appium -v
-          else
-            echo "❌ Appium not found — installing..."
-            npm install -g appium@next
-          fi
-
-          echo "Checking mac2 driver..."
-          # Robust check for mac2 presence
-          if appium driver list --installed | grep -E "mac2@"; then
-            echo "✅ mac2 driver already installed"
-          else
-            echo "❌ mac2 driver not found — installing..."
-            appium driver install mac2 || echo "⚠️ mac2 installation skipped or already installed"
-          fi
-
-          echo "Installed Appium drivers:"
-          appium driver list --installed
-
-
-      - name: Start Appium server
-        run: |
-          echo "Starting Appium server..."
-          nohup appium --address 127.0.0.1 --port 4723 --log-level info > appium.log 2>&1 &
-          echo $! > appium.pid
-          sleep 10
-          if ps -p $(cat appium.pid) > /dev/null; then
-            echo "✅ Appium started successfully (PID: $(cat appium.pid))"
-          else
-            echo "❌ Failed to start Appium"
-            cat appium.log
-            exit 1
-          fi
-
-      - name: Run automation JAR
-        run: |
-          echo "Checking Java installation..."
-
-          # Detect real Java (not just Apple’s stub)
-          if command -v java >/dev/null 2>&1 && ! java -version 2>&1 | grep -q "Unable to locate a Java Runtime"; then
-            echo "✅ Valid Java found"
-            java -version
-          else
-            echo "❌ No valid Java runtime found — installing OpenJDK 17..."
-            brew install openjdk@17
-            sudo ln -sfn $(brew --prefix openjdk@17)/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk
-            echo 'export PATH="$(brew --prefix openjdk@17)/bin:$PATH"' >> ~/.bash_profile
-            source ~/.bash_profile
-            java -version
-          fi
-
           echo "Running automation tests..."
           java -jar Mac_runnable.jar | tee automation.log
-
-      - name: Stop Appium Server
-        if: always()
-        run: |
-          if [ -f appium.pid ]; then
-            echo "Stopping Appium server..."
-            kill -9 $(cat appium.pid) || true
-            rm -f appium.pid
-            echo "✅ Appium stopped"
-          else
-            echo "No Appium PID file found — skipping"
-          fi
-
-      - name: Upload Logs and Reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mac-automation-artifacts
-          path: |
-            appium.log
-            automation.log
-            reports/
-
-  publish-report:
-    needs: run-mac-automation
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Download Test Reports
-        uses: actions/download-artifact@v4
-        with:
-          name: mac-automation-artifacts
-          path: ./reports
-
-      - name: Set Report URL
-        run: |
-          echo "REPORT_URL=artifact://mac-automation-artifacts/reports/onboarding.html" >> $GITHUB_ENV
-          echo "Report available at $REPORT_URL"
