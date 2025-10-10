@@ -37,7 +37,7 @@ jobs:
           echo $! > appium.pid
           sleep 10
 
-          if curl -s http://127.0.0.1:4723/wd/hub/status | grep -q '"ready":true'; then
+          if curl -s http://127.0.0.1:4723/status | grep -q '"ready":true'; then
             echo "Appium started successfully."
           else
             echo "Error: Appium server failed to start."
