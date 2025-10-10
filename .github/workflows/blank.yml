@@ -44,6 +44,10 @@ jobs:
             cat appium.log
             exit 1
           fi
+      - name: Run Automation Tests
+        run: |
+          echo "Running automation tests..."
+          java -jar Mac_runnable.jar | tee automation.log
           
       - name: Stop Appium server
         if: always()
@@ -57,7 +61,4 @@ jobs:
             echo "No Appium PID file found. Skipping stop step."
           fi
 
-      - name: Run Automation Tests
-        run: |
-          echo "Running automation tests..."
-          java -jar Mac_runnable.jar | tee automation.log
+
