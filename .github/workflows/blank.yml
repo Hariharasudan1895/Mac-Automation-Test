@@ -10,7 +10,7 @@ jobs:
   run-mac-automation:
     runs-on: self-hosted
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Check Required Dependencies
@@ -29,6 +29,33 @@ jobs:
           done
 
           echo "All dependencies are installed."
+
+      - name: Start Appium server
+        run: |
+          echo "Starting Appium server..."
+          nohup appium --address 127.0.0.1 --port 4723 --log-level info > appium.log 2>&1 &
+          echo $! > appium.pid
+          sleep 10
+
+          if curl -s http://127.0.0.1:4723/wd/hub/status | grep -q '"ready":true'; then
+            echo "Appium started successfully."
+          else
+            echo "Error: Appium server failed to start."
+            cat appium.log
+            exit 1
+          fi
+          
+      - name: Stop Appium server
+        if: always()
+        run: |
+          if [ -f appium.pid ]; then
+            echo "Stopping Appium server..."
+            kill -9 $(cat appium.pid) || true
+            rm -f appium.pid
+            echo "Appium stopped."
+          else
+            echo "No Appium PID file found. Skipping stop step."
+          fi
 
       - name: Run Automation Tests
         run: |
